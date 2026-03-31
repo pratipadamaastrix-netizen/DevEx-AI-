@@ -1003,10 +1003,7 @@ def chat_api():
         # user_id = "web_user"
         
         #user_id = request.remote_addr
-        if "chat_id" not in session:
-            session["chat_id"] = str(uuid.uuid4())
-
-        user_id = session["chat_id"]
+        user_id = request.remote_addr
         reply = handle_chat(user_id, full_message)
 
         return jsonify({"reply": reply})

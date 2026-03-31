@@ -864,7 +864,8 @@ def chat_api():
 
         full_message = message + "\n" + file_text
 
-        user_id = "web_user"
+        #user_id = "web_user"
+        user_id = request.remote_addr
 
         reply = handle_chat(user_id, full_message)
 

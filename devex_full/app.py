@@ -893,7 +893,6 @@ urgency=low/normal/urgent
         }
     ] + history
 
-    # ===== CALL DEEPSEEK =====
     response = requests.post(
         "https://api.deepseek.com/v1/chat/completions",
         headers={
@@ -904,10 +903,18 @@ urgency=low/normal/urgent
             "model": "deepseek-chat",
             "messages": messages,
             "temperature": 0.3
-        }
+        },
+        timeout=20
     )
 
-    ai_text = response.json()["choices"][0]["message"]["content"]
+    data = response.json()
+
+    print("DEEPSEEK RESPONSE:", data)
+
+    if "choices" not in data:
+        return "⚠️ AI service temporarily unavailable. Please try again."
+
+    ai_text = data["choices"][0]["message"]["content"]
     ai_text = ai_text.replace("```", "").strip()
 
     print("AI:", ai_text)

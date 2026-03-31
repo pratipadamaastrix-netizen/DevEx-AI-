@@ -724,33 +724,28 @@ def handle_chat(user_id, message):
     # 🔥 Build conversation
     messages = [
         {
-    "role": "system",
-    "content": """
-You are a facility management assistant.
+            "role": "user",
+            "content": """
+    You are a facility management assistant.
 
-Your job:
-- Talk naturally
-- Extract:
-  name, flat, issue, urgency
+    Your job:
+    - Talk naturally
+    - Extract:
+    name, flat, issue, urgency
 
-RULES:
-- Never leave fields empty
-- Ask missing info step-by-step
-- When all info collected → return EXACT:
+    RULES:
+    - Never leave fields empty
+    - Ask missing info step-by-step
+    - When all info collected → return EXACT:
 
-CREATE_TICKET:
-name=...
-flat=...
-issue=...
-urgency=low/normal/urgent
-
-IMPORTANT:
-- urgency must be only: low, normal, urgent
-- issue must be clear (not 1 word)
-"""
-}
+    CREATE_TICKET:
+    name=...
+    flat=...
+    issue=...
+    urgency=low/normal/urgent
+    """
+        }
     ] + session["history"]
-
     # 🔥 Call DeepSeek
     response = requests.post(
         "https://api.deepseek.com/v1/chat/completions",

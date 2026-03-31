@@ -2,7 +2,7 @@
 .env
 
 # Databases
-*.db
+# *.db
 
 # Uploaded files
 photos/

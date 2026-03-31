@@ -10,8 +10,9 @@ try:
 except ImportError:
     pass  # python-dotenv not installed — use environment variables directly
 
-from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect, session
 import sqlite3
+ 
 import os
 from twilio.twiml.messaging_response import MessagingResponse 
 from PIL import Image
@@ -554,9 +555,9 @@ def create_ticket(name, flat, issue, urgency):
         ))
         
         conn.execute("""
-            INSERT INTO fm_conversations
-            (ticket_ref, sender, body, source, is_internal, created_at)
-            VALUES (?, 'customer', ?, 'webchat', 0, datetime('now'))
+          INSERT INTO fm_conversations
+(session_id, sender, body, source, is_internal, created_at)
+VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
             """, (
                 ref,
                 issue
@@ -847,9 +848,9 @@ def handle_chat(user_id, message):
     conn = get_engine_db()
 
     rows = conn.execute("""
-        SELECT sender, body
-        FROM fm_conversations
-        WHERE ticket_ref = ?
+       SELECT sender, body
+FROM fm_conversations
+WHERE session_id = ?
         ORDER BY created_at
         LIMIT 20
     """, (user_id,)).fetchall()
@@ -914,16 +915,16 @@ urgency=low/normal/urgent
     conn = get_engine_db()
 
     conn.execute("""
-        INSERT INTO fm_conversations
-        (ticket_ref, sender, body, source, is_internal, created_at)
-        VALUES (?, 'customer', ?, 'webchat', 0, datetime('now'))
+    INSERT INTO fm_conversations
+    (session_id, sender, body, source, is_internal, created_at)
+    VALUES (?, 'customer', ?, 'webchat', 0, datetime('now'))
     """, (user_id, message))
 
     # ===== SAVE AI RESPONSE =====
     conn.execute("""
-        INSERT INTO fm_conversations
-        (ticket_ref, sender, body, source, is_internal, created_at)
-        VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
+    INSERT INTO fm_conversations
+    (session_id, sender, body, source, is_internal, created_at)
+    VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
     """, (user_id, ai_text))
 
     conn.commit()
@@ -1000,8 +1001,11 @@ def chat_api():
 
         # user_id = "web_user"
         
-        user_id = request.remote_addr
+        #user_id = request.remote_addr
+        if "chat_id" not in session:
+            session["chat_id"] = str(uuid.uuid4())
 
+        user_id = session["chat_id"]
         reply = handle_chat(user_id, full_message)
 
         return jsonify({"reply": reply})

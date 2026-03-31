@@ -699,9 +699,9 @@ def fire_door_tool():
 # CHAT UI ROUTE (ADD HERE)
 # =========================
 
-chat_sessions = {}
+# chat_sessions = {}
 
-def get_chat_session(user_id):
+# def get_chat_session(user_id):
 
     if user_id not in chat_sessions:
         chat_sessions[user_id] = {
@@ -711,7 +711,7 @@ def get_chat_session(user_id):
     return chat_sessions[user_id]
 
 
-def handle_chat(user_id, message):
+# def handle_chat(user_id, message):
 
     session = get_chat_session(user_id)
 
@@ -840,6 +840,140 @@ IMPORTANT:
 
     return ai_text
 
+
+def handle_chat(user_id, message):
+
+    # ===== LOAD HISTORY FROM DATABASE =====
+    conn = get_engine_db()
+
+    rows = conn.execute("""
+        SELECT sender, body
+        FROM fm_conversations
+        WHERE ticket_ref = ?
+        ORDER BY created_at
+        LIMIT 20
+    """, (user_id,)).fetchall()
+
+    history = []
+
+    for r in rows:
+        role = "assistant" if r["sender"] != "customer" else "user"
+        history.append({"role": role, "content": r["body"]})
+
+    conn.close()
+
+    # Add latest user message
+    history.append({"role": "user", "content": message})
+
+    # ===== SYSTEM PROMPT =====
+    messages = [
+        {
+            "role": "system",
+            "content": """
+You are a facility management assistant.
+
+Your job:
+- Talk naturally
+- Extract:
+  name, flat, issue, urgency
+
+RULES:
+- Never leave fields empty
+- Ask missing info step-by-step
+- When all info collected → return EXACT:
+
+CREATE_TICKET:
+name=...
+flat=...
+issue=...
+urgency=low/normal/urgent
+"""
+        }
+    ] + history
+
+    # ===== CALL DEEPSEEK =====
+    response = requests.post(
+        "https://api.deepseek.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "deepseek-chat",
+            "messages": messages,
+            "temperature": 0.3
+        }
+    )
+
+    ai_text = response.json()["choices"][0]["message"]["content"]
+    ai_text = ai_text.replace("```", "").strip()
+
+    print("AI:", ai_text)
+
+    # ===== SAVE USER MESSAGE =====
+    conn = get_engine_db()
+
+    conn.execute("""
+        INSERT INTO fm_conversations
+        (ticket_ref, sender, body, source, is_internal, created_at)
+        VALUES (?, 'customer', ?, 'webchat', 0, datetime('now'))
+    """, (user_id, message))
+
+    # ===== SAVE AI RESPONSE =====
+    conn.execute("""
+        INSERT INTO fm_conversations
+        (ticket_ref, sender, body, source, is_internal, created_at)
+        VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
+    """, (user_id, ai_text))
+
+    conn.commit()
+    conn.close()
+
+    # ===== CHECK FOR TICKET CREATION =====
+    if "CREATE_TICKET:" in ai_text:
+
+        try:
+
+            lines = ai_text.split("\n")
+            data = {}
+
+            for line in lines:
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    data[k.strip().lower()] = v.strip()
+
+            name = (data.get("name") or "").strip()
+            flat = (data.get("flat") or "").strip()
+            issue = (data.get("issue") or "").strip()
+            urgency = (data.get("urgency") or "").lower().strip()
+
+            if "urgent" in urgency:
+                urgency = "urgent"
+            elif "low" in urgency:
+                urgency = "low"
+            else:
+                urgency = "normal"
+
+            if not name:
+                return "👤 Please tell me your name."
+
+            if not issue:
+                return "🛠️ Please describe the issue."
+
+            ref = create_ticket(name, flat, issue, urgency)
+
+            if ref:
+                return f"✅ Ticket created!\nReference: {ref}"
+
+            return "❌ Ticket creation failed."
+
+        except Exception as e:
+
+            print("Ticket error:", e)
+            return "❌ Ticket creation failed."
+
+    return ai_text
+ 
 @app.route("/chat", methods=["POST"])
 def chat_api():
 
@@ -864,7 +998,9 @@ def chat_api():
 
         full_message = message + "\n" + file_text
 
-        user_id = "web_user"
+        # user_id = "web_user"
+        
+        user_id = request.remote_addr
 
         reply = handle_chat(user_id, full_message)
 

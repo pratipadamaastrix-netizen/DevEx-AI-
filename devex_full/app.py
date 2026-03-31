@@ -849,12 +849,12 @@ def handle_chat(user_id, message):
     conn = get_engine_db()
 
     rows = conn.execute("""
-       SELECT sender, body
-FROM fm_conversations
-WHERE session_id = ?
-        ORDER BY created_at
-        LIMIT 20
-    """, (user_id,)).fetchall()
+    SELECT sender, body
+    FROM fm_conversations
+    WHERE ticket_ref = ?
+    ORDER BY created_at
+    LIMIT 20
+    """, (user_id,)).fetchall() 
 
     history = []
 
@@ -917,14 +917,14 @@ urgency=low/normal/urgent
 
     conn.execute("""
     INSERT INTO fm_conversations
-    (session_id, sender, body, source, is_internal, created_at)
+    (ticket_ref, sender, body, source, is_internal, created_at)
     VALUES (?, 'customer', ?, 'webchat', 0, datetime('now'))
     """, (user_id, message))
 
     # ===== SAVE AI RESPONSE =====
     conn.execute("""
     INSERT INTO fm_conversations
-    (session_id, sender, body, source, is_internal, created_at)
+    (ticket_ref, sender, body, source, is_internal, created_at)
     VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
     """, (user_id, ai_text))
 

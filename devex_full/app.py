@@ -51,6 +51,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'photos'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -555,13 +556,13 @@ def create_ticket(name, flat, issue, urgency):
         ))
         
         conn.execute("""
-          INSERT INTO fm_conversations
-(session_id, sender, body, source, is_internal, created_at)
-VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
-            """, (
-                ref,
-                issue
-        ))
+    INSERT INTO fm_conversations
+    (ticket_ref, sender, body, source, is_internal, created_at)
+    VALUES (?, 'assistant', ?, 'webchat', 0, datetime('now'))
+    """, (
+        ref,
+        issue
+    ))
 
         conn.commit()
         conn.close()

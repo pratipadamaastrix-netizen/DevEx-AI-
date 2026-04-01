@@ -3341,7 +3341,7 @@ def report_submit():
 @app.route('/ops/dashboard')
 def ops_overview():
     if not session.get("admin_logged_in"):
-        return redirect("/admin-login")
+        return redirect("/login")
 
     conn = get_engine_db()
 
@@ -3996,7 +3996,7 @@ def fm_get_db():
 @app.route('/fm/dashboard')
 def fm_dashboard():
     if not session.get("admin_logged_in"):
-        return redirect("/admin-login")
+        return redirect("/login")
     conn = fm_get_db()
 
     # KPI counts
@@ -5650,6 +5650,8 @@ def wa_api_simulate():
 
 @app.route('/wa/monitor')
 def wa_monitor():
+    if not session.get("admin_logged_in"):
+        return redirect("/login")
     """WhatsApp bridge live monitor page."""
     return render_template('wa/monitor.html', active_nav='fm_dashboard')
 
@@ -5670,7 +5672,7 @@ def wa_api_config():
         'flush_keywords': list(WA_FLUSH_KEYWORDS),
     })
     
-@app.route("/admin-login", methods=["GET","POST"])
+@app.route("/login", methods=["GET","POST"])
 def admin_login():
 
     if request.method == "POST":

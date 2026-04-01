@@ -14,6 +14,7 @@ from flask import Flask, render_template, request, jsonify, send_file, send_from
 import sqlite3
 import os
 from twilio.twiml.messaging_response import MessagingResponse 
+import google.generativeai as genai
 from PIL import Image
 from datetime import datetime
 from io import BytesIO
@@ -32,24 +33,31 @@ from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 from dotenv import load_dotenv
 import os
+from flask import session
 
 load_dotenv()
 
 import google.generativeai as genai
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-print("Gemini Key:", GEMINI_API_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
-
 import requests
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 # ===== GEMINI SETUP (ADD HERE) =====
+import google.generativeai as genai
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
+
+@app.before_request
+def initialize_database():
+    if not hasattr(app, "db_initialized"):
+        print("🔥 Running DB init...")
+        init_db()
+        app.db_initialized = True
+
+app.secret_key = os.getenv("SECRET_KEY")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'photos'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -62,7 +70,7 @@ os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
 # Fire Door system uses its own database
 FIRE_DOOR_DB_PATH = 'fire_door_reports.db'
 # Engine system uses separate database (CF1.1: Physical split complete)
-ENGINE_DB_PATH = 'engine.db'
+ENGINE_DB_PATH = 'engine_v4.db'
 ###################################
     
 def extract_text_from_document(file):
@@ -342,15 +350,8 @@ def get_fire_door_db():
     return conn
 
 def get_engine_db():
-    """Get database connection for Engine/Artefact system"""
-    import os
     import sqlite3
-
-    db_path = os.path.join(os.path.dirname(__file__), "engine.db")
-
-    print("DB PATH:", db_path)
-
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(ENGINE_DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -481,24 +482,40 @@ def run_fire_door_migrations(conn):
 
 
 def run_fm_migrations(conn):
-    """Run FM Operations migrations — idempotent, safe to call on every start."""
     print("  Running FM migrations...")
-    if not table_exists(conn, 'fm_tickets'):
-        print("  Creating FM tables from schema_fm.sql...")
-        with open('schema_fm.sql', 'r') as f:
+
+    base_dir = os.path.dirname(__file__)
+
+    # =========================
+    # FM TABLES
+    # =========================
+    fm_schema = os.path.join(base_dir, 'schema_fm.sql')
+
+    print("FM SCHEMA PATH:", fm_schema)
+    print("FILE EXISTS:", os.path.exists(fm_schema))
+
+    try:
+        with open(fm_schema, 'r') as f:
             conn.executescript(f.read())
-        print("  ✓ FM tables created")
-    else:
-        print("  FM tables already exist")
-    # WA bridge tables
-    if not table_exists(conn, 'wa_sessions'):
-        print("  Creating WA bridge tables from schema_wa.sql...")
-        with open('schema_wa.sql', 'r') as f:
+        print("✓ FM tables ensured")
+    except Exception as e:
+        print("❌ FM migration error:", e)
+
+
+    # =========================
+    # WHATSAPP TABLES
+    # =========================
+    wa_schema = os.path.join(base_dir, 'schema_wa.sql')
+
+    print("WA SCHEMA PATH:", wa_schema)
+    print("FILE EXISTS:", os.path.exists(wa_schema))
+
+    try:
+        with open(wa_schema, 'r') as f:
             conn.executescript(f.read())
-        print("  ✓ WA bridge tables created")
-    else:
-        print("  WA bridge tables already exist")
-    
+        print("✓ WA tables ensured")
+    except Exception as e:
+        print("❌ WA migration error:", e)  
 import uuid
 
 def create_ticket(name, flat, issue, urgency):
@@ -519,7 +536,7 @@ def create_ticket(name, flat, issue, urgency):
 
         if "urgent" in text or "sparking" in text or "emergency" in text:
             priority = "urgent"
-        elif "medium" in text:
+        elif "medium" in text or "normal" in text:
             priority = "normal"
         else:
             priority = "low"
@@ -701,52 +718,51 @@ def fire_door_tool():
 
 chat_sessions = {}
 
-def get_chat_session(user_id):
-
-    if user_id not in chat_sessions:
-        chat_sessions[user_id] = {
-            "history": []
-        }
-
-    return chat_sessions[user_id]
-
-
 def handle_chat(user_id, message):
 
-    session = get_chat_session(user_id)
-
-    # Store conversation history
+    # ✅ FIX: Initialize session
     if "history" not in session:
         session["history"] = []
 
-    session["history"].append({"role": "user", "content": message})
+    # Store user message
+    session["history"].append({
+        "role": "user",
+        "content": message
+    })
 
-    # 🔥 Build conversation
+    print("CHAT HISTORY:", session["history"])
+
+    # Build messages
     messages = [
         {
-            "role": "user",
+            "role": "system",
             "content": """
-    You are a facility management assistant.
+You are a facility management assistant.
 
-    Your job:
-    - Talk naturally
-    - Extract:
-    name, flat, issue, urgency
+Your job:
+- Talk naturally
+- Extract:
+name, flat, issue, urgency
 
-    RULES:
-    - Never leave fields empty
-    - Ask missing info step-by-step
-    - When all info collected → return EXACT:
+RULES:
+- Never leave fields empty
+- Ask missing info step-by-step
+- When all info collected → return EXACT:
 
-    CREATE_TICKET:
-    name=...
-    flat=...
-    issue=...
-    urgency=low/normal/urgent
-    """
+CREATE_TICKET:
+name=...
+flat=...
+issue=...
+urgency=low/normal/urgent
+
+IMPORTANT:
+- urgency must be only: low, normal, urgent
+- issue must be clear (not 1 word)
+"""
         }
     ] + session["history"]
-    # 🔥 Call DeepSeek
+
+    # Call DeepSeek
     response = requests.post(
         "https://api.deepseek.com/v1/chat/completions",
         headers={
@@ -760,13 +776,27 @@ def handle_chat(user_id, message):
         }
     )
 
-    ai_text = response.json()["choices"][0]["message"]["content"]
+    data = response.json()
+
+    # ✅ Safety check
+    if "choices" not in data:
+        print("DeepSeek ERROR:", data)
+        return "⚠️ AI error. Try again."
+
+    ai_text = data["choices"][0]["message"]["content"]
     ai_text = ai_text.replace("```", "").strip()
-    
-    session["history"].append({"role": "assistant", "content": ai_text})
+
+    # Store AI response
+    session["history"].append({
+        "role": "assistant",
+        "content": ai_text
+    })
+
+    session.modified = True  # ✅ important for Render
 
     print("AI:", ai_text)
 
+    # (rest of your ticket logic stays same)
     # 🔥 CHECK IF READY TO CREATE TICKET
     if "CREATE_TICKET:" in ai_text:
 
@@ -824,7 +854,7 @@ def handle_chat(user_id, message):
             ref = create_ticket(name, flat, issue, urgency)
 
             if ref:
-                chat_sessions.pop(user_id)
+                chat_sessions.pop(user_id, None)
                 return f"✅ Ticket created!\nReference: {ref}"
             else:
                 return "❌ Ticket creation failed. Please try again."
@@ -858,18 +888,23 @@ def chat_api():
             file_text = extract_text_from_document(file)
 
         full_message = message + "\n" + file_text
+        print("FINAL MESSAGE:", full_message)
 
-        #user_id = "web_user"
-        user_id = request.remote_addr
+        user_id = "web_user"
 
         reply = handle_chat(user_id, full_message)
+        print("REPLY:", reply)
 
-        return jsonify({"reply": reply})
+        return jsonify({"reply": reply or "No response"})
 
     except Exception as e:
-        print("CHAT ERROR:", e)
-        return jsonify({"reply": "❌ Server error: "})
+        import traceback
+        print("🔥 FULL ERROR:")
+        traceback.print_exc()
 
+        return jsonify({
+            "reply": str(e)
+        })
 @app.route("/wa/inbound", methods=["POST"])
 def wa_inbound_new():
 
@@ -3212,6 +3247,10 @@ def landing():
         categories=ISSUE_CATEGORIES,
         wa_link=wa_link
     )
+
+@app.route("/evidence_fm/<path:filename>")
+def evidence_fm(filename):
+    return send_from_directory("evidence_fm", filename)
 
 
 @app.route('/report', methods=['POST'])
@@ -5667,4 +5706,3 @@ if __name__ == "__main__":
 
 
 # ===== COMMERCIAL ROUTES (STUBS FOR REPURPOSING) =====
-

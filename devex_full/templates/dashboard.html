@@ -7,13 +7,37 @@
 {% endblock %}
 
 {% block topbar %}
-<div class="topbar-title">
-    <h1>Dashboard</h1>
-    <p>Facilities Management Overview</p>
+
+<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+
+    <div class="topbar-title">
+        <h1>Dashboard</h1>
+        <p>Facilities Management Overview</p>
+    </div>
+
+    <div class="topbar-actions" style="display:flex;gap:10px;align-items:center;">
+
+        <a href="/fm/dashboard" class="btn btn-primary">
+            + New Ticket
+        </a>
+
+        <a href="/logout"
+           style="
+           background:#ef4444;
+           color:white;
+           padding:8px 14px;
+           border-radius:6px;
+           text-decoration:none;
+           font-size:13px;
+           font-weight:500;
+           ">
+           Logout
+        </a>
+
+    </div>
+
 </div>
-<div class="topbar-actions">
-    <a href="/fm/dashboard" class="btn btn-primary">+ New Ticket</a>
-</div>
+
 {% endblock %}
 
 {% block content %}

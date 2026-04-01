@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass  # python-dotenv not installed — use environment variables directly
 
-from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect, session
 import sqlite3
 import os
 from twilio.twiml.messaging_response import MessagingResponse 
@@ -58,6 +58,7 @@ def initialize_database():
         app.db_initialized = True
 
 app.secret_key = os.getenv("SECRET_KEY")
+
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'photos'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -3339,6 +3340,8 @@ def report_submit():
 @app.route('/ops')
 @app.route('/ops/dashboard')
 def ops_overview():
+    if not session.get("admin_logged_in"):
+        return redirect("/admin-login")
 
     conn = get_engine_db()
 
@@ -3992,7 +3995,8 @@ def fm_get_db():
 @app.route('/fm')
 @app.route('/fm/dashboard')
 def fm_dashboard():
-
+    if not session.get("admin_logged_in"):
+        return redirect("/admin-login")
     conn = fm_get_db()
 
     # KPI counts
@@ -5665,7 +5669,27 @@ def wa_api_config():
         'flush_timeout': WA_FLUSH_TIMEOUT_S,
         'flush_keywords': list(WA_FLUSH_KEYWORDS),
     })
+    
+@app.route("/admin-login", methods=["GET","POST"])
+def admin_login():
 
+    if request.method == "POST":
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if username == "admin" and password == "123456":
+            session["admin_logged_in"] = True
+            return redirect("/ops/dashboard")
+
+        return "Invalid login"
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("admin_logged_in", None)
+    return redirect("/")
 
 if __name__ == "__main__":
 

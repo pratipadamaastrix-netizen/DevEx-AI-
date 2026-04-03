@@ -378,7 +378,10 @@ def init_db():
     if not engine_exists:
         print(f"  Creating Engine DB: {ENGINE_DB_PATH}")
         conn = sqlite3.connect(ENGINE_DB_PATH)
-        with open('schema_engine.sql', 'r') as f:
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        schema_path = os.path.join(BASE_DIR, "schema_engine.sql")
+
+        with open(schema_path, "r") as f:
             conn.executescript(f.read())
         conn.commit()
         conn.close()
@@ -399,7 +402,9 @@ def init_db():
     if not fire_door_exists:
         print(f"  Creating Fire Door DB: {FIRE_DOOR_DB_PATH}")
         conn = sqlite3.connect(FIRE_DOOR_DB_PATH)
-        with open('schema_fire_door.sql', 'r') as f:
+        schema_path = os.path.join(BASE_DIR, "schema_fire_door.sql")
+        with open(schema_path, "r") as f:
+            conn.executescript(f.read())
             conn.executescript(f.read())
         conn.commit()
         conn.close()

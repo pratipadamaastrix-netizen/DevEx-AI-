@@ -64,21 +64,13 @@ os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
 # Engine system uses separate database (CF1.1: Physical split complete)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Local development path
-LOCAL_DB = os.path.join(BASE_DIR, "database")
+# Create persistent database folder
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
-# Render path
-RENDER_DB = "/tmp"
-
-if os.path.exists("/tmp"):
-    DB_FOLDER = RENDER_DB
-else:
-    DB_FOLDER = LOCAL_DB
-
-os.makedirs(DB_FOLDER, exist_ok=True)
-
-ENGINE_DB_PATH = os.path.join(DB_FOLDER, "engine_v4.db")
-FIRE_DOOR_DB_PATH = os.path.join(DB_FOLDER, "fire_door_reports.db")
+# Database paths
+ENGINE_DB_PATH = os.path.join(DATA_DIR, "engine_v4.db")
+FIRE_DOOR_DB_PATH = os.path.join(DATA_DIR, "fire_door_reports.db")
 
 ###################################
     

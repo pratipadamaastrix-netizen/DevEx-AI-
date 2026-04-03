@@ -64,13 +64,21 @@ os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
 # Engine system uses separate database (CF1.1: Physical split complete)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Create persistent database folder
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+# Local development path
+LOCAL_DB = os.path.join(BASE_DIR, "database")
 
-# Database paths
-ENGINE_DB_PATH = os.path.join(DATA_DIR, "engine_v4.db")
-FIRE_DOOR_DB_PATH = os.path.join(DATA_DIR, "fire_door_reports.db")
+# Render path
+RENDER_DB = "/tmp"
+
+if os.path.exists("/tmp"):
+    DB_FOLDER = RENDER_DB
+else:
+    DB_FOLDER = LOCAL_DB
+
+os.makedirs(DB_FOLDER, exist_ok=True)
+
+ENGINE_DB_PATH = os.path.join(DB_FOLDER, "engine_v4.db")
+FIRE_DOOR_DB_PATH = os.path.join(DB_FOLDER, "fire_door_reports.db")
 
 ###################################
     
@@ -484,12 +492,8 @@ def run_fire_door_migrations(conn):
 def run_fm_migrations(conn):
     print("  Running FM migrations...")
 
-    base_dir = os.path.dirname(__file__)
-
-    # =========================
-    # FM TABLES
-    # =========================
-    fm_schema = os.path.join(base_dir, 'schema_fm.sql')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    fm_schema = os.path.join(BASE_DIR, "schema_fm.sql")
 
     print("FM SCHEMA PATH:", fm_schema)
     print("FILE EXISTS:", os.path.exists(fm_schema))
@@ -505,7 +509,7 @@ def run_fm_migrations(conn):
     # =========================
     # WHATSAPP TABLES
     # =========================
-    wa_schema = os.path.join(base_dir, 'schema_wa.sql')
+    wa_schema = os.path.join(BASE_DIR, 'schema_wa.sql')
 
     print("WA SCHEMA PATH:", wa_schema)
     print("FILE EXISTS:", os.path.exists(wa_schema))

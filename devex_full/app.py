@@ -405,7 +405,6 @@ def init_db():
         schema_path = os.path.join(BASE_DIR, "schema_fire_door.sql")
         with open(schema_path, "r") as f:
             conn.executescript(f.read())
-            conn.executescript(f.read())
         conn.commit()
         conn.close()
         print(f"  ✓ Fire Door database created: {FIRE_DOOR_DB_PATH}")
@@ -5703,7 +5702,7 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
-    app.run()
+    app.run(host="0.0.0.0", port=5000)
 
     print("\n" + "="*60)
     print("FACILITIES MANAGEMENT PLATFORM - VERSION 0.2.8")

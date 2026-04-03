@@ -492,12 +492,8 @@ def run_fire_door_migrations(conn):
 def run_fm_migrations(conn):
     print("  Running FM migrations...")
 
-    base_dir = os.path.dirname(__file__)
-
-    # =========================
-    # FM TABLES
-    # =========================
-    fm_schema = os.path.join(base_dir, 'schema_fm.sql')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    fm_schema = os.path.join(BASE_DIR, "schema_fm.sql")
 
     print("FM SCHEMA PATH:", fm_schema)
     print("FILE EXISTS:", os.path.exists(fm_schema))
@@ -513,7 +509,7 @@ def run_fm_migrations(conn):
     # =========================
     # WHATSAPP TABLES
     # =========================
-    wa_schema = os.path.join(base_dir, 'schema_wa.sql')
+    wa_schema = os.path.join(BASE_DIR, 'schema_wa.sql')
 
     print("WA SCHEMA PATH:", wa_schema)
     print("FILE EXISTS:", os.path.exists(wa_schema))

@@ -50,13 +50,6 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 
-@app.before_request
-def initialize_database():
-    if not hasattr(app, "db_initialized"):
-        print("🔥 Running DB init...")
-        init_db()
-        app.db_initialized = True
-
 app.secret_key = os.getenv("SECRET_KEY")
 
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
@@ -68,10 +61,17 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
 
 # ===== DATABASE PATHS - CF1.1 PHYSICAL SPLIT =====
-# Fire Door system uses its own database
-FIRE_DOOR_DB_PATH = 'fire_door_reports.db'
 # Engine system uses separate database (CF1.1: Physical split complete)
-ENGINE_DB_PATH = 'engine_v4.db'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Create persistent database folder
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Database paths
+ENGINE_DB_PATH = os.path.join(DATA_DIR, "engine_v4.db")
+FIRE_DOOR_DB_PATH = os.path.join(DATA_DIR, "fire_door_reports.db")
+
 ###################################
     
 def extract_text_from_document(file):
@@ -351,8 +351,7 @@ def get_fire_door_db():
     return conn
 
 def get_engine_db():
-    import sqlite3
-    conn = sqlite3.connect(ENGINE_DB_PATH)
+    conn = sqlite3.connect(ENGINE_DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -5694,6 +5693,8 @@ def logout():
     return redirect("/")
 
 if __name__ == "__main__":
+    init_db()
+    app.run()
 
     print("\n" + "="*60)
     print("FACILITIES MANAGEMENT PLATFORM - VERSION 0.2.8")

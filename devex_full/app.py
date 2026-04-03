@@ -49,7 +49,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
-
 app.secret_key = os.getenv("SECRET_KEY")
 
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
@@ -5700,8 +5699,9 @@ def logout():
     session.pop("admin_logged_in", None)
     return redirect("/")
 
-if __name__ == "__main__":
+with app.app_context():
     init_db()
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 
     print("\n" + "="*60)
